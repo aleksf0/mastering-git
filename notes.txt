@@ -1,0 +1,556 @@
+Git is not what you think (Layer: Content tracker)
+===========================
+* If you want to master Git, don't worry about learning the commands. Instead, learn the concept.
+
+* Git onion layers:
+  - A distributed revision control system - same as any other revision control system, but also distributed.
+  - A revision control system - includes history, branches, merges.
+  - A stupid content tracker - tracks files or directories.
+  - At its core Git is a map, i.e. it is a table with keys and values, where values are pieces of content and keys are their SHA1 hashes. This structure is persistent - it is stored on the disk.
+
+* Every object in Git has its own SHA1 - file versions, directories, commits, annotated tags. SHA1 are 20 bytes in hexadecimal format, so they are a sequence of 40 hex digits. SHA1 hash can be generated for any piece of content. For the same content the hash is always the same.
+  $ echo "Apple Pie" | git hash-object --stdin
+  23991897e13e47ed0adb91a0082c31c82fe0cbe5
+
+* Storing things in Git:
+  - Creating a repository in the current directory:
+    $ git init
+    This command creates a new hidden subdirectory called ".git".
+  - Generating a hash and also writing it to the repository (-w flag):
+    $ echo "Apple Pie" | git hash-object --stdin -w
+    This is saved to .git/objects/23/991897e13e47ed0adb91a0082c31c82fe0cbe5, where 23 is what the SHA1 starts with and 991897e13e47ed0adb91a0082c31c82fe0cbe5 is what it finishes with. This is just a trick to avoid piling up all the content into a single huge clutter directory. Our original string, "Apple Pie", is inside this file. This is what Git calls a Blob of data.
+  - Since the file contents are mangled a bit (compressed), the following command is used to view the file contents (-t for type, -p for pretty-printing):
+    $ git cat-file 23991897e13e47ed0adb91a0082c31c82fe0cbe5 -p
+
+* First commit:
+    $ git init
+  - See the files and folders in the project root (all files untracked):
+    $ git status
+  - Add untracked files to Staging area:
+    $ git add menu.txt
+    $ git add recipes
+  - See the files and folders in the project root (all files added to staging area):
+    $ git status
+  - Commit staged files:
+    $ git commit -m "First commit!"
+  - See the files and folders in the project root (Staging area is clear):
+    $ git status
+  - See the list of existing commits:
+    $ git log
+    commit c259405f7709ec806b76e832b7ddbb8ca348385d (HEAD -> master)
+    Author: Aleksandr Fokin <afok@danskebank.com>
+    Date:   Sat Jul 28 20:38:08 2018 +0300
+    First commit!
+  - See the commit file:
+    $ git cat-file c259405f7709ec806b76e832b7ddbb8ca348385d
+    tree 46624f2d142b3a74e3aac65f691cdfdbb42ce022
+    author Aleksandr Fokin <afok@danskebank.com> 1532799488 +0300
+    committer Aleksandr Fokin <afok@danskebank.com> 1532799488 +0300
+    First commit!
+    A Commit is a simple and very short piece of text, nothing else. The commit contains a SHA1 of a Tree.
+  - In this case (for Commits), a Tree is the root directory of the project:
+    $ git cat-file -p 46624f2d142b3a74e3aac65f691cdfdbb42ce022
+    100644 blob 9eed377bbdeb4aa5d14f8df9cd50fed042f41023    menu.txt
+    040000 tree 5458b1e1046e66dd8dbb249fc4ff64ab29ff90a9    recipes
+    Just like a Commit, the Tree is a tiny piece of text, contains list of directory contents. There is a Tree of a subdirectory listed there as well.
+  - Let's take a look at 'recipes' tree:
+    $ git cat-file -p 5458b1e1046e66dd8dbb249fc4ff64ab29ff90a9
+    100644 blob 37c0180c056cc7bf91b1046c4990ec5ee71668f2    README.txt
+    100644 blob 9eed377bbdeb4aa5d14f8df9cd50fed042f41023    apple_pie.txt
+    The apple_pie.txt and menu.txt blobs are exactly the same contents, therefore SHA1 are the same  for both and only single object is created for them in /.git/objects
+  - Now let's take a look at the README.txt:
+    $ git cat-file -p 37c0180c056cc7bf91b1046c4990ec5ee71668f2
+    Put your recipes in this directory, one recipe per file.
+  - Lifefycle:
+    Untracked files -> Staging Area -> Commit
+  - Blob is not really a file - it is just a content of a file. The file name and the file permissions are not stored in the Blob - they are stored in the Tree that points to the Blob.
+  - The generated SHA1 hashes for the same content are exactly the same (most Blobs and Trees hashes match the ones shown in the video course). The only Blob that is different is the Commit one - the author is different and Commit time is different.
+  
+  - To recap - the concept of Commit:
+    o The Commit points to the root directory Tree:
+      tree 46624f2d142b3a74e3aac65f691cdfdbb42ce022
+    o In turn, root directory Tree (46624f2d142b3a74e3aac65f691cdfdbb42ce022) points to a Blob and a sub-Tree: 
+      100644 blob 9eed377bbdeb4aa5d14f8df9cd50fed042f41023    menu.txt
+      040000 tree 5458b1e1046e66dd8dbb249fc4ff64ab29ff90a9    recipes
+    o In turn, a sub-Tree (5458b1e1046e66dd8dbb249fc4ff64ab29ff90a9) points to another 2 Blobs:
+      100644 blob 37c0180c056cc7bf91b1046c4990ec5ee71668f2    README.txt
+      100644 blob 9eed377bbdeb4aa5d14f8df9cd50fed042f41023    apple_pie.txt
+
+* Versioning Made Easy
+  - Change menu.txt by adding 'Cheesecake'
+    $ git status
+    $ git add menu.txt
+    $ git status
+    $ git commit -m "Add cake"
+    $ git status
+    $ git log
+    commit 40bdad1038578128e353946e2d98229c082aa3be (HEAD -> master)
+    Author: Aleksandr Fokin <afok@danskebank.com>
+    Date:   Sat Jul 28 23:23:31 2018 +0300
+    Add cake
+    commit c259405f7709ec806b76e832b7ddbb8ca348385d
+    Author: Aleksandr Fokin <afok@danskebank.com>
+    Date:   Sat Jul 28 20:38:08 2018 +0300
+    First commit!
+  - The 2nd commit has got a Parent - this is how commits are linked with one another:
+    $ git cat-file -p 40bdad1038578128e353946e2d98229c082aa3be
+    tree 8a913a85d035f9b3f4097087520dec7cfbada5b0
+    parent c259405f7709ec806b76e832b7ddbb8ca348385d
+    author Aleksandr Fokin <afok@danskebank.com> 1532809411 +0300
+    committer Aleksandr Fokin <afok@danskebank.com> 1532809411 +0300
+  - Notice, that the SHA1 hash of the Tree in the 2nd Commit is different from the first one:
+    8a913a85d035f9b3f4097087520dec7cfbada5b0 vs. 46624f2d142b3a74e3aac65f691cdfdbb42ce022
+    $ git cat-file -p 8a913a85d035f9b3f4097087520dec7cfbada5b0
+    100644 blob b63cba247afc716104ab997704f0973823894907    menu.txt
+    040000 tree 5458b1e1046e66dd8dbb249fc4ff64ab29ff90a9    recipes
+    This is because the 2nd commit points to a "new version" of the root directory, where the menu.txt file contents have changed.
+  - The current object count in object database in /.git/objects is 8:
+    x2 commits, x2 versions of project root, x1 version of 'recipes' folder, x3 distinct contents - menu.txt(1st version)/apple_pie.txt, menu.txt(2nd version), README.txt.
+    $ git count-objects
+    8 objects, 0 kilobytes
+  - Git stores a new Blob each time the file changes. What if there is a huge file and only a single line changed? Git has implemented some optimisation techniques, where only the difference is saved or the compression of multiple objects takes place. This is where /.git/objects/info and /.git/objects/pack are involved.
+    (last seconds - picture)
+
+* Tags - Annotated (below), Regular (covered later)
+  Tag - a label for the current state of the project.
+  - Create annotated tag for latest commit:
+    $ git tag -a mytag -m "I love cheesecake"
+  - List annotated tags:
+    $ git tag 
+  - Tag is also an object in Git database, like Commit, Blob, etc. 
+    $ git cat-file -p mytag
+    object 40bdad1038578128e353946e2d98229c082aa3be
+    type commit
+    tag mytag
+    tagger Aleksandr Fokin <afok@danskebank.com> 1532818219 +0300
+    I love cheesecake
+    Tag points to an Object, which in this case is a 2nd Commit. In other words - Tags are labels for Commits.
+     
+* To recap, in the Git object database we have:
+  - Blobs - arbitrary content. Pure content - no file permissions, no file names. Can be referenced by multiple Trees if the "pure content" is the same.
+  - Trees - the equivalent for directories. Store references to Blobs and other Trees, like links in Linux or shortcuts in Windows.
+  - Commits - point to project root of the current version (Blobs and Trees hierarchy)
+  - Annotated tags - labels for Commits
+  There are just these 4 types of objects in Git database and nothing else.
+    
+* Git is ... a persistent map or a stupid content tracker. It was written by Linus Torvalds and possibly this is why Git looks like a separate file system built on the top of the OS file system.
+
+
+Branches demystified (Layer: Revision control system: Branches, Merges, Rebases)
+===========================
+* What Branches really are
+  - We haven't created any branches yet, but the MASTER Branch is created when we do our first commit:
+    $ git branch
+    * master
+  - The Branches are stored in /.git/refs/heads in separate files and contain a SHA1 of the current Commit:
+    $ cat .git/refs/heads/master
+    40bdad1038578128e353946e2d98229c082aa3be
+    Branch is nothing much, but a simple reference to a Commit - this explains the 'refs' name of the directory. Master Branch is just a Branch, like any other. The Branches can be manipulated by creating, renaming or deleting the files in this folder.
+  - The right way to create Branch is:
+    $ git branch lisa
+    $ git branch
+      lisa
+    * master
+  - Currently both MASTER and LISA branches refer to the same Commit:
+    $ cat .git/refs/heads/lisa
+    40bdad1038578128e353946e2d98229c082aa3be
+
+* The Mechanics of the Current branch
+  - Asterisk (*) marks the Current branch. Git knows which branch is marked as Current from the HEAD file:
+    $ cat .git/HEAD
+    ref: refs/heads/master
+    HEAD is just a reference to a Branch (a pointer to a pointer, since in turn, Branch is just a reference to Commit).
+  - Amend the /recipes/apple_pie.txt and commit:
+    $ git status
+    $ git add recipes/apple_pie.txt
+    $ git status
+    $ git commit -m "Add recipe"
+    $ git status
+    $ git log
+    commit 01a5709d73ffa48ea9adb991c026949ee0167909 (HEAD -> master)
+    Author: Aleksandr Fokin <afok@danskebank.com>
+    Date:   Sun Jul 29 12:31:54 2018 +0300
+    Add recipe
+    commit 40bdad1038578128e353946e2d98229c082aa3be (tag: mytag, lisa)
+    Author: Aleksandr Fokin <afok@danskebank.com>
+    Date:   Sat Jul 28 23:23:31 2018 +0300
+    Add cake
+    commit c259405f7709ec806b76e832b7ddbb8ca348385d
+    Author: Aleksandr Fokin <afok@danskebank.com>
+    Date:   Sat Jul 28 20:38:08 2018 +0300
+    First commit!
+  - 3rd Commit has a 2nd Commit as a parent:
+    $ git cat-file -p 01a5709d73ffa48ea9adb991c026949ee0167909
+    tree 8ac27fc16794d5b20ad1a9acef46153d40012595
+    parent 40bdad1038578128e353946e2d98229c082aa3be
+    author Aleksandr Fokin <afok@danskebank.com> 1532856714 +0300
+    committer Aleksandr Fokin <afok@danskebank.com> 1532856714 +0300
+    Add recipe
+  - After creating a Commit object, Git looked inside the HEAD file to find what the Current branch is and it moved that branch to point at the new commit:
+    $ cat .git/refs/heads/master
+    01a5709d73ffa48ea9adb991c026949ee0167909
+  - The HEAD file itself wasn't changed - still points to MASTER Branch:
+    $ cat .git/HEAD
+    ref: refs/heads/master
+  - Changing the Current branch from MASTER to LISA:
+    $ git checkout lisa
+    $ git branch
+    * lisa
+      master
+    Two things happen here:
+    o Git changes HEAD to point to LISA instead of Master
+      $ cat .git/HEAD
+      ref: refs/heads/lisa
+    o The working area (project directory) contents are replaced to reflect what is currently stored in the Commit that LISA branch is pointing at currently.
+      $ cat recipes/apple_pie.txt
+      Apple Pie
+      $ git log
+      commit 40bdad1038578128e353946e2d98229c082aa3be (HEAD -> lisa, tag: mytag)
+      Author: Aleksandr Fokin <afok@danskebank.com>
+      Date:   Sat Jul 28 23:23:31 2018 +0300
+      Add cake
+      commit c259405f7709ec806b76e832b7ddbb8ca348385d
+      Author: Aleksandr Fokin <afok@danskebank.com>
+      Date:   Sat Jul 28 20:38:08 2018 +0300
+      First commit!
+      So CHECKOUT means move HEAD and update the working area.
+  - Update the "older version" of recipes/apple_pie.txt again and commit:
+    $ git add recipes/apple_pie.txt
+    $ git commit -m "Add Lisa's version of the apple pie"
+    $ git log
+    commit cbf341aa8883f8282f9ce977e5f80fc32342fe96 (HEAD -> lisa)
+    Author: Aleksandr Fokin <afok@danskebank.com>
+    Date:   Sun Jul 29 13:02:49 2018 +0300
+    Add Lisa's version of the apple pie
+    commit 40bdad1038578128e353946e2d98229c082aa3be (tag: mytag)
+    Author: Aleksandr Fokin <afok@danskebank.com>
+    Date:   Sat Jul 28 23:23:31 2018 +0300
+    Add cake
+    commit c259405f7709ec806b76e832b7ddbb8ca348385d
+    Author: Aleksandr Fokin <afok@danskebank.com>
+    Date:   Sat Jul 28 20:38:08 2018 +0300
+    First commit!
+  - Again, after creating a Commit object, Git looked inside the HEAD file to find what the Current branch is and it moved that branch to point at the new commit:
+    $ cat .git/refs/heads/lisa
+    cbf341aa8883f8282f9ce977e5f80fc32342fe96
+  - The HEAD file itself wasn't changed - still points to MASTER Branch:
+    $ cat .git/HEAD
+    ref: refs/heads/lisa
+    
+* Let's Merge!
+  - Move back to MASTER branch:
+    $ git checkout master
+    $ git branch
+      lisa
+    * master
+    Branch didn't move, but HEAD did move.
+  - We want to merge changes from LISA branch to MASTER branch:
+    $ git merge lisa
+    Auto-merging recipes/apple_pie.txt
+    CONFLICT (content): Merge conflict in recipes/apple_pie.txt
+    Automatic merge failed; fix conflicts and then commit the result.
+    $ git status
+  - We need to resolve the conflict manually now by editing the apple_pie.txt directly:
+    $ vim recipes/apple_pie.txt
+    o Before:
+      Apple Pie
+
+      pre-made pastry
+      1/2 cup butter
+      3 tablespoons flour1 cup sugar
+      <<<<<<< HEAD
+      8 Granny Smith apples
+      =======
+      1 tbsp cinnamon
+      10 Granny Smith apples
+      >>>>>>> lisa
+    o After:
+      Apple Pie
+
+      pre-made pastry
+      1/2 cup butter
+      3 tablespoons flour1 cup sugar
+      1 tbsp cinnamon
+      9 Granny Smith apples
+  - After the conflict has been resolved (the apple_pie.txt amended manually) - it is still not staged yet:
+    $ git status
+  - Staging the recipes/apple_pie.txt is our way to tell Git that the conflict has been fixed:
+    $ git add recipes/apple_pie.txt
+    $ git status
+  - Now we need to complete the Merge manually (Git would have done this step automatically if auto-merge was successful):
+    $ git commit
+    We don't even have to provide the Commit message, since Git knows we are in the middle of the Merge.
+    The pre-generated Commit message opens in the vim editor available for changing if desired (usually not). Type ":wq" to proceed.
+  - Check the Commit message:
+    $ git log
+    commit f00d5065b6e0b4b095fb9d8699b0642f208f56bc (HEAD -> master)
+    Merge: 01a5709 cbf341a
+    Author: Aleksandr Fokin <afok@danskebank.com>
+    Date:   Sun Jul 29 14:03:22 2018 +0300
+    Merge branch 'lisa'
+    commit cbf341aa8883f8282f9ce977e5f80fc32342fe96 (lisa)
+    Author: Aleksandr Fokin <afok@danskebank.com>
+    Date:   Sun Jul 29 13:02:49 2018 +0300
+    Add Lisa's version of the apple pie
+    ...    
+  - Check the Merge object:
+    $ git cat-file -p f00d5065b6e0b4b095fb9d8699b0642f208f56bc
+    tree 66fc5d5afb465199dd7d3be99c6969250d3cf912
+    parent 01a5709d73ffa48ea9adb991c026949ee0167909
+    parent cbf341aa8883f8282f9ce977e5f80fc32342fe96
+    author Aleksandr Fokin <afok@danskebank.com> 1532862202 +0300
+    committer Aleksandr Fokin <afok@danskebank.com> 1532862202 +0300
+    Merge branch 'lisa'
+    A Merge is just a Commit with one exception - it has 2 parents! Both are references to previous Commits in MASTER and LISA Branches.
+  - MASTER Branch is moved to a new Commit and LISA Branch remained the same (needs to be destroyed?):
+    $ cat .git/refs/heads/master
+    f00d5065b6e0b4b095fb9d8699b0642f208f56bc
+    $ cat .git/refs/heads/lisa
+    cbf341aa8883f8282f9ce977e5f80fc32342fe96
+
+* Time travel for developers
+  - The objects in a Git database are Commits, Trees, Blobs and Annotated Tags. All these objects are arranged in a graph and reference each other. There are:
+    o references from Annotated Tags to Commits
+    o references from the Commit to its Parents
+    o references from the Commit to its Tree
+    o references from Trees to Blobs and other Trees
+  - All references are used in 2 different ways:
+    o References between Commits are used to trach history
+    o All the other references are used to track content
+  - When we Checkout something, Git doesn't care about history and doesn't look at the ways Commits are connected to each other. Git just cares about Trees and Blobs that reference the content in the Git database - this is how it knows the exact state (content) of the working area (project directory) at the time of Commit.
+    o Git content management is simple. Retrieving the past state in Git is a pretty simple affair.
+    o Git (mostly) doesn't care about your working directory. Remember, when you Checkout, Git just replaces the working are with the stuff from the object database. The objects in the database are immutable and persistend while the files in the working directory are changing all the time. Git is not reckless though - it gives a warning if you attempt to Checkout when uncommitted changes are pending.
+
+* Merging without Merging
+  - Checkout LISA Branch (HEAD moves to point at LISA):
+    $ git checkout lisa
+  - Earlier we Merged LISA to MASTER. Now we want to Merge MASTER to LISA:
+    $ git merge master
+    Updating cbf341a..f00d506
+    Fast-forward
+     recipes/apple_pie.txt | 2 +-
+     1 file changed, 1 insertion(+), 1 deletion(-)
+    We want the Commit that contains the latest stuff in MASTER and the latest version of all the stuff in LISA, but we already have such Commit - it's the latest commit in MASTER with all the conflicts solved. This is what Fast-forward line indicates - no new Commit is created, but LISA Branch now points to the same Commit as MASTER Branch.
+
+* Losing your HEAD
+  - Checkout MASTER Branch:
+    $ git checkout master 
+  - So far we knew, that HEAD is a reference to a Branch, but we can Checkout a specific Commit instead:
+    $ git checkout f00d5065b6e0b4b095fb9d8699b0642f208f56bc
+    $ cat .git/HEAD
+    f00d5065b6e0b4b095fb9d8699b0642f208f56bc
+    $ git branch
+    * (HEAD detached at f00d506)
+      lisa
+      master
+  - Lets amend recipes/apple_pie.txt and Commit:
+    $ git add recipes/
+    $ git commit -m "Add more apples"
+    In this case Git cannot move the current Branch to point to newest Commit, since there is no current Branch, so it will track the latest commit by moving HEAD directly. HEAD behaves exactly like Branch now:
+    $ cat .git/HEAD
+    5d163041520ba0d9171d49c1cb3c1d8a04bc4a49
+  - Abandoning the experiment:
+    $ git checkout master
+    What happened to this detached Commit? It is still in the object database, but unreachable, unless its SHA1 was noted down. Since there are no references pointing to it (from Branch, HEAD or Tag) - it will be garbage collected at some point in time. 
+  - Saving the detached Commit by creating a Branch for it:
+    $ git checkout 5d163041520ba0d9171d49c1cb3c1d8a04bc4a49
+    $ git branch nogood
+  - Pointing HEAD back to MASTER, since the detached Commit is now in its own Branch called NOGOOD:
+    $ git checkout master
+  - In general, the "Detached HEAD" approach is good for experimenting, when the changes most likely to be abandoned - we can detach HEAD, do experiment, still commit as much as we wish for history and then decide whether to keep the experiment or throw it away.
+  
+* Recap:
+  - A Git repository is a bunch of objects (commits, blobs, trees, tags) linked to each other in a graph.
+  - Branches are references to commits.
+  - HEAD is also a reference, but there is only one. It marks our current position in the graph - Branch or Commit directly.
+  - Rules:
+    o The current branch tracks new commits. Same with Detached HEAD.
+    o When you move to another commit (checkout), Git updates the working directory.
+    o Unreachable objects are garbage collected.
+
+
+Rebasing made simple (Layer: still Revision control system: Tags)
+===========================
+* What a Rebase looks like
+  - Rebase - an alternative to Merge.
+    Prework:
+    $ git checkout master
+    $ git branch spaghetti
+    $ git checkout spaghetti
+    $ git add menu.txt
+    $ git commit -m "Add spaghetti alla carbonara"
+    $ git add recipes/
+    $ git commit -m "Add carbonara ingredients"
+    
+    $ git checkout master
+    $ git add recipes/
+    $ git commit -m "Tweak apple pie"
+    $ git add recipes/
+    $ git commit -m "Tweak apple pie some more"
+  - Instead of Merging, we will Rebase the Current branch over the other branch:
+    $ git checkout spaghetti
+    $ git rebase master
+    First, rewinding head to replay your work on top of it...
+    Applying: Add spaghetti alla carbonara
+    Applying: Add carbonara ingredients
+  - If we Rebase SPAGHETTI over MASTER, this is what happens:
+    o Git looks for the first commit in SPAGHETTI that is also a commit in MASTER, i.e. a base of the SPAGHETTI branch.
+    o Then Git will detach the entire SPAGHETTI branch from this base commit and move it to the top of all MASTER commits, i.e. it changes the base of the SPAGHETTI branch.
+    o Like in Merge, there could be a need of solving conflicts.
+  - After a rebase the SPAGHETTI Branch contains all the commits from the MASTER branch + SPAGHETTI stuff:
+    $ git log
+    (all commits from both branches are listed)
+  - If we wanted this to happen the other way around, i.e. Rebase MASTER on top of SPAGHETTI:
+    $ git checkout master
+    $ git rebase spaghetti
+    First, rewinding head to replay your work on top of it...
+    Fast-forwarded master to spaghetti.
+  - Different than Merge, we got to the same result not by letting multiple branches flow together, but by rearranging the branches so that they look like one single branch.
+
+* An illusion of movement, garbage collection
+  - When you rebase, Git makes copies of the "from" commits on top of the rebasement branch. These cannot be the same commits, since they refer to the new Parents (different content), therefore, have different SHA1 hash themselves.
+  - Remember: Rebasing is an operation that creates new commits.
+  - Since the references to the original SPAGHETTI commits are lost (SPAGHETTI branch is now pointed to the copies of those commits) - the garbage collector will collect them in time. This applies to any unreachable objects in Git - usually Commits, but sometimes also Trees and Blobs.
+
+* The Trade-offs of Merges
+  - It preserves history exactly as it happened, i.e. Merges never lie. We can clearly see that the commits in 2 separate Branches were created independently and then Merged in a single commit afterwards, including fixes to the conflicts.
+  - The concept is this simple, however, it becomes tricky when we're looking at the large project where Branches and Merges are used a lot. In such projects the `git log` (as opposed to `stree`) can be misleading, since the log is showing history as if it were a single long timeline with one commit after another, where the changes in Branches were actually done in parallel.
+
+* The Trade-offs of Rebases
+  - A Rebased history looks really simple and neat. Commits are arranged in a single timeline, so the project that uses rebasing generally looks more streamlined and clean than a project that uses a lot of merging, history-wise.
+  - Rebasing helps to refactor history so that it's always nice to look at.
+  - This neatness comes at a cost - the history is not real, since the commit copies are created on top of other commits. So in contrast to Merges, Rebases change the project history.
+  - Why messing with history is bad? There are some advanced Git commands that become less useful if we tamper with project history.
+  - There is one common scenario where rewriting history can become truly painful. This is related to Distribution and is covered in the next module.
+  - Bottom line: Rebases make history cleaner, but they can also cause unwanted side effects.
+  - Recommendation: When in doubt - just Merge.
+
+* Tags in brief
+  - We have already created an Annotated Tag named 'mytag' previously by running command:
+    $ git tag -a mytag -m "I love cheesecake"
+    $ git tag
+    mytag
+  - Annotated tag files contain the SHA1 of a tag object in the database, and that object in turn is referencing a commit along with all the extra metadata:
+      $ cat .git/refs/tags/mytag
+    1f58d92b7e925690b37d2cd77899d407513e1e42
+    $ git cat-file -p 1f58d92b7e925690b37d2cd77899d407513e1e42
+    object 40bdad1038578128e353946e2d98229c082aa3be
+    type commit
+    tag mytag
+    tagger Aleksandr Fokin <afok@danskebank.com> 1532818219 +0300
+    I love cheesecake
+  - Sometimes there is no reason to have all this metadata, but a simple label for a Commit. This is where the Regular/Lightweight/Non-annotated tag can be created:
+    $ git tag dinner
+    $ git tag
+    dinner
+    mytag
+  - Lightweight Tag files only contain a reference to a Commit:
+    $ cat .git/refs/tags/dinner
+    22c0695d2fdf826bc8be54b2200b0e7f7b8c4e62
+  - Latest commit:
+    $ git log -1
+    commit 22c0695d2fdf826bc8be54b2200b0e7f7b8c4e62 (HEAD -> master, tag: dinner, spaghetti)
+    Author: Aleksandr Fokin <afok@danskebank.com>
+    Date:   Sun Jul 29 16:18:41 2018 +0300
+    Add carbonara ingredients
+  - We already know of /.git/refs/heads directory, which contains Branches. Tags (all?) can be easily converted to Branches by simply moving them from /.git/refs/tags/* to /.git/refs/heads/*.
+  - So what is the difference between Tags and Branches? While Branches move (on new Commit), Tags don't.
+
+
+Distributed Version Control (Layer: Distribution)
+===========================
+* Prework:
+  $ git config user.email "aleksandr.fokin@gmail.com"
+  $ export http_proxy=http://<username:password>@proxy-w-app.danskenet.net:80
+  $ export https_proxy=http://<username:password>@proxy-w-app.danskenet.net:80
+  $ git remote add origin https://github.com/aleksf0/how-git-works.git
+  $ git push -u origin --mirror
+  $ cd ..
+  $ rm -r -f how-git-works
+
+* A World of Peers:
+  - What Git clone does:
+    o Creates an empty directory with the same name as repository name.
+    o Copies the most of the .git directory from the GitHub project to this directory.
+    o Copies only the MASTER branch. If more is needed - there are specific commands.
+    o Copies over the objects in the object database (commits, trees, blobs, annotated tags). 
+    o Checks out the MASTER branch to rebuild the files in the working area.
+    $ git clone https://github.com/aleksf0/how-git-works.git
+    $ cd how-git-works
+    $ git config user.email "aleksandr.fokin@gmail.com"
+  - Since the .git/objects contains the entire repository - now we have a copy of the project and its history locally.
+  - Both clones (the GitHub one and local one) are equally good, but usually one specific clone is picked and decided to be the most important one - typically the one in the cloud (GitHub or BitBucket). From a technical standponint - all the clones are peers.
+
+* Local and Remote
+  - Each Git repository (such as this local one) carry member information about other copies of the same repository (in this case, the GitHub one). Each "other" copy is called a "remote". We can define multiple remotes manually, but when the project is cloned - Git immediately defines a default remote and calls it "origin". Origin has a URL reference to its source.
+    $ vim .git/config
+    ...
+    [remote "origin"]
+      url = https://github.com/aleksf0/how-git-works.git
+      fetch = +refs/heads/*:refs/remotes/origin/*
+    [branch "master"]
+      remote = origin
+       merge = refs/heads/master
+    ...
+    This default configuration says that we have one MASTER branch that maps over the MASTER branch on a remote.
+  - So now Git remembers which other repo (or repos) we want to synchronize with. In order to synchronize, Git also needs to know the current state of origin (the remote repo), i.e. which Branches are there on the remote, which Commits those branches are currently pointed at, etc. Git does store this information - the remote branches and the current position of remote HEAD:
+    $ git branch
+    * master
+    $ git branch --all
+    * master
+    remotes/origin/HEAD -> origin/master
+    remotes/origin/lisa
+    remotes/origin/master
+    remotes/origin/nogood
+    remotes/origin/spaghetti
+  - Remote branches are tracked by Git the same way as the local branches - by writing those branches as references in /.git/refs/remotes/origin (and sometimes in /.git/packed-refs file due to optimisation). The information in this folder is automatically updated whenever we synchronize with the remote (push/pull).
+    o MASTER branches:
+      $ git show-ref master
+      57f73c54a003ffd026a9ae1d0b3c0054be6e46be refs/heads/master
+      57f73c54a003ffd026a9ae1d0b3c0054be6e46be refs/remotes/origin/master
+      The command above lists all the branches that have "master" in their names and there are 2 - local and remote. Currently, both pointing at the same commit.
+    o LISA branch:
+      $ git show-ref lisa
+      f00d5065b6e0b4b095fb9d8699b0642f208f56bc refs/remotes/origin/lisa
+      There is only one LISA branch - remote. And it points at an older commit that both MASTER branches.
+  - Recap:
+    o Like a local branch, a remote branch is just a reference to a commit.
+    o Whenever we synchronize with the remote (push/pull) - Git updates the remote branches.
+    
+  Note: `git push origin master` means pushing your changes over to "master" branch on to your default remote called "origin". 
+
+* The joy of Pushing
+  - Since each object is immutable and has unique SHA1, if we create some new objects in the local repository - during synchronisation they can be simply copied over to origin.
+  - Git also has to keep branches sychronized:
+    $ vim recipes/apple_pie.txt
+    $ git add recipes/
+    $ git commit -m "Add lemon juice to the apple pie"
+    $ git show-ref master
+    d0ae33af1719dca97b4706ccb278efda22c4dbfa refs/heads/master
+    57f73c54a003ffd026a9ae1d0b3c0054be6e46be refs/remotes/origin/master
+    $ git push
+    $ git show-ref master
+    d0ae33af1719dca97b4706ccb278efda22c4dbfa refs/heads/master
+    d0ae33af1719dca97b4706ccb278efda22c4dbfa refs/remotes/origin/master
+  - During Push:
+    o We have 1 local commit - local MASTER branch now points to this commit
+    o When we push - Git copies our new commit over to the origin and remote MASTER branch there now also points to this new commit.
+    o Then the origin MASTER branch is also updated the same way on the local repository.
+    What if someone else committed something to the remote MASTER branch on the origin before our commit? Now we've got 2 different histories that need to be reconciled. In very special occasions the Push can be forced (-f flag) - the remote MASTER on the origin would now point to our commit (that would match our history) and we're probably losing somebody else's commit, who in turn will also have a conflicting local history with the origin. There is a better way.
+    
+* The chore of Pulling
+  - In the previous situatiom - we want to fix the conflict on our own machine before the Push.
+    $ git fetch 
+    The 'fetch' retrieves the new objects (including new commits) from the remote and also update the positions of the remote branches locally.
+  - Now we can 'merge' our local changes with the remote history. When we've merged - our history is the history from the remote + our local new stuff and now we can Push that new stuff to the remote without rewriting the remote history.
+  - The 'fetch'/'merge'/'push' sequence is so common, that there is one single command that handles both 'fetch' and 'merge' - it is called 'pull'.
+
+* Rebase revisited
+  - Never rebase stuff that has been shared with some other repository. It's okay to rebase commits that you haven't shared yet. The trouble comes from the fact that during the rebase the commits are not moved, but copied, i.e. these are 'different' commits from Git perspective.
+  - If the rebased commits are shared - it messes up a history in the remote, but this can be tackled by forced-push or pull followed by push. However, things break down for another user who tries to push his own commits to the forked branch - the original commit has gone from the remote, which is a pickle to sort out.
+
+* Getting social (features of GitHub)
+  Since we can't push to somebody else's project on GitHub, we can create a Fork, i.e. copy somebody else's project to our account (remote clone). GitHub does know about the connection between our project and original project, but Git doesn't. If we want to track changes to the original project - we need to add another remote pointing at it in local Git repository. This is something that needs to be done manually and the name of such remote is "upstream".
+  o All our commits can be pushed to the "origin".
+  o If there are any changes in the "upstream" - we can pull them, merge and push to "origin".
+  o Since we can't push our changes to "upstream" - we can create a "pull request" to the maintainers of the original project asking them to pull our changes. "Pull requests" is not a version control feature, but is a social network feature.
