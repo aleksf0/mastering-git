@@ -431,7 +431,7 @@ Rebasing made simple (Layer: still Revision control system: Tags)
     $ git tag
     mytag
   - Annotated tag files contain the SHA1 of a tag object in the database, and that object in turn is referencing a commit along with all the extra metadata:
-      $ cat .git/refs/tags/mytag
+    $ cat .git/refs/tags/mytag
     1f58d92b7e925690b37d2cd77899d407513e1e42
     $ git cat-file -p 1f58d92b7e925690b37d2cd77899d407513e1e42
     object 40bdad1038578128e353946e2d98229c082aa3be
@@ -464,6 +464,7 @@ Distributed Version Control (Layer: Distribution)
   $ export http_proxy=http://<username:password>@proxy-w-app.danskenet.net:80
   $ export https_proxy=http://<username:password>@proxy-w-app.danskenet.net:80
   $ git remote add origin https://github.com/aleksf0/how-git-works.git
+  <create how-git-works repository on GitHub>
   $ git push -u origin --mirror
   $ cd ..
   $ rm -r -f how-git-works
@@ -517,7 +518,7 @@ Distributed Version Control (Layer: Distribution)
     o Like a local branch, a remote branch is just a reference to a commit.
     o Whenever we synchronize with the remote (push/pull) - Git updates the remote branches.
     
-  Note: `git push origin master` means pushing your changes over to "master" branch on to your default remote called "origin". 
+  Note: `git push origin master` means pushing your changes from the local "master" branch over to "master" branch on to your default remote called "origin". 
 
 * The joy of Pushing
   - Since each object is immutable and has unique SHA1, if we create some new objects in the local repository - during synchronisation they can be simply copied over to origin.
@@ -554,3 +555,100 @@ Distributed Version Control (Layer: Distribution)
   o All our commits can be pushed to the "origin".
   o If there are any changes in the "upstream" - we can pull them, merge and push to "origin".
   o Since we can't push our changes to "upstream" - we can create a "pull request" to the maintainers of the original project asking them to pull our changes. "Pull requests" is not a version control feature, but is a social network feature.
+
+
+Appendix A: Commands summary
+===========================
+* Local init, State:
+  - Create git repository in the current folder:
+    $ git init
+  - Create SHA1 of the content and write to the repository:
+    $ echo "Apple Pie" | git hash-object --stdin -w
+    23991897e13e47ed0adb91a0082c31c82fe0cbe5
+  - Get file contents (as-is, compressed):
+    $ cat .git/objects/23/991897e13e47ed0adb91a0082c31c82fe0cbe5
+  - Get contents of any git object by hash or name (branch, tag):
+    $ git cat-file -p 23991897e13e47ed0adb91a0082c31c82fe0cbe5
+  - Count repository database objects:
+    $ git count-objects
+  - Show working area files status:
+    $ git status
+  - Register the changes for the commit:
+    $ git add .
+
+* Commits:
+  - Show list of all commits:
+    $ git log
+  - Show last commit of the current branch:
+    $ git log -1
+  - Create commit:
+    $ git commit -m "This is a commit!"
+
+* Tags:
+  - Show tags:
+    $ git tag
+  - Create a tag for the last commit that current branch points at:
+    $ git tag mytag
+  - Create annotated tag for the last commit that current branch points at:
+    $ git tag -a myannotatedtag -m "Message for tag"
+
+* Branches:
+  - Show both local and remote branches:
+    $ git branch --all
+  - Create new branch from the last commit that current branch points at:
+    $ git branch mybranch
+  - Checkout a different branch (or commit):
+    $ git checkout mybranch
+  - Create "feature2" branch, check it out and set it to track the "feature" branch on origin: 
+    $ git checkout -b feature2 origin/feature
+
+* Merge:
+  - Merge changes from mybranch to the current branch:
+    $ git merge mybranch
+    <resolve any conflicts manually via text editor>
+    $ git add .
+    $ git commit
+
+* Rebase:
+  - Rebase the current branch over the mybranch:
+    $ git rebase mybranch
+    <resolve any conflicts manually via text editor>
+    $ git add .
+    $ git commit
+
+* Remote Init:
+  - Link local repository with remote repository ("origin"):
+    $ git remote add origin https://github.com/aleksf0/how-git-works.git
+  - Set the "origin" remote branch as "upstream" and push all local .git/refs/heads, .git/refs/remotes, .git/refs/tags, etc. to it:
+    <create how-git-works repository on GitHub>
+    $ git push --set-upstream origin --mirror
+  - Clone remote git repository locally:
+    $ git clone https://github.com/aleksf0/how-git-works.git
+
+* Remote synchronisation:
+  - Show all refs (local/remote branches, tags) containing word 'master':
+    $ git show-ref master
+  - Fetch the git object database (including commits) from all origin branches (or only the ones existing in local repo?):
+    $ git fetch
+  - Merge the commits from the tracking/corresponding branch on origin to the current branch:
+    $ git merge
+  - Fetch the commits from "feature1" branch on the origin and merge them to the current branch:
+    $ git pull origin feature1
+  - Fetch the commits from the tracking/corresponding branch on origin and merge them to the current branch:
+    $ git pull
+  - Create an upstream branch "branch1" on the origin and push the commits to it from local branch "branch1" (which branch is checked-out currently has no difference):
+    $ git push --set-upstream origin branch1
+  - Push the commits from the local "branch1" branch over to the tracking/corresponding branch on origin (usually "origin/branch1", which branch is checked-out currently has no difference):
+    $ git push origin branch1
+  - Push the commits from the current branch over to the tracking/corresponding branch on origin (usually by the same name):
+    $ git push
+
+
+Appendix B: Git repository file structure
+===========================
+.git/HEAD - a pointer to a branch or a commit
+.git/objects/* - git repository object database (blobs, trees, commits, annotated tags)
+.git/refs/heads/* - local branches (point to a commit, changed on a commit)
+.git/refs/remotes/*, /.git/packed-refs - remote branches (point to a commit, updated on push/pull)
+.git/refs/tags/* - tags (point to a commit, left unchanged on commit)
+.git/config - the configuraiton properties of the repository
