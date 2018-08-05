@@ -1,2 +1,2 @@
-# how-git-works
-How Git Works Pluralsight course by Paolo Perrotta
+# mastering-git
+Mastering Git Pluralsight course by Paolo Perrotta
