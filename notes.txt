@@ -1,0 +1,771 @@
+The Four Areas: Introduction
+======================
+* Course structure:
+  - Part 1: The Four Areas
+    o Intro. In the git project there are 4 storage areas and you move data across those areas.
+    o Basic Workflow. How basic git operations move data across the 4 areas (adding files, committing, moving files, etc.).
+    o Git reset.
+    o Advanced Tools.
+  - Part 2: History
+    o Exploring the Past.
+    o Fixing mistakes.
+  - Part 3:
+    o Finding Your Workflow
+* The Four Areas:
+  - Working area (project dir)
+  - Index (staging area, where the files are put before a commit)
+  - Repository (git object database .git/objects, most important)
+  - Stash (temporary storage area)
+* To understand most important git commands ask this:
+  - How does this command move information across the Four Areas? (e.g. Index -> Repo, Repo -> Working Area, any deletions happen?)
+  - How does this command change the Repository? (does it create new commits? does it move branches? does it move HEAD reference? etc.)
+* The Index area:
+  - The 'nothing to commit' message means that all 3 areas (Working, Index and Repository) are currently aligned and contain the same files, i.e. it doesn't mean that the Index is empty.
+    $ git status
+    On branch master
+    Your branch is up to date with 'origin/master'.
+    nothing to commit, working tree clean
+  - Compare the Working Area with Index:
+    $ git diff
+    This is the default diff behavior when no additional arguments are passed. Usually `git status` is used instead.
+  - Compare the Index with Repository (stuff I want to commit with stuff that is already committed):
+    $ git diff --cached
+
+
+The Four Areas: Basic Workflow
+======================
+* Moving Data to the Right (Working Area -> Index -> Repo):
+  <add Chicken Tikka Masala to menu.txt>
+  $ git status (the file is red)
+  $ git add (only moved data from Working Area to Index)
+  $ git status (the file is now in Index as well as Working area, it is green)
+  $ git diff (sees no difference)
+  $ git diff --cached (the changes between the Index and Repo are highlighted)
+  $ git commit -m "Add Tikka Masala to menu" (moved data from Index to Repo and also changed the Repo by adding new commit object)
+  $ git status (all 3 areas are aligned again)
+  $ git diff
+  $ git diff --cached
+
+* Moving Data to the Left (Working Area <- Index <- Repo):
+  $ git diff lisa master (show changes between 'lisa' branch and 'master' branch in Repository)
+  $ git checkout lisa (HEAD moved to 'lisa' branch and copied contents from the Repository to both Working Area and Index)
+  $ git status (we're in clean status again)
+  $ git checkout master (getting back to 'master' branch)
+
+* Removing files:
+  <Create COPYRIGHT file>
+  $ git status (the COPYRIGHT file is marked as 'untracked', i.e. it is only in Working Area and not in Index or Repo)
+  $ git add COPYRIGHT
+  $ git status (status of this file is shown as 'new', so it is in the Index, but still not in Repo)
+  $ git rm COPYRIGHT (fails with a warning of options --cached and -f, since the file is not in the Repo)
+  $ git rm COPYRIGHT --cached (removes the file from Index, but keeps it in Working Area)
+  $ git status (status of this file is shown as 'untracked' again)
+  $ rm COPYRIGHT
+  $ git status (we're in clean state again)
+  $ git rm COPYRIGHT -f (we haven't executed it, since this removes the file from both Index and Working Area, if it is staged)
+  To recap - `git add` only affects the Index, but `git rm` also affects the Working Area.
+  
+* Renaming/Moving files:
+  - Implicit way (used most often - letting git figure out what was renamed):
+    $ git status (starting from clean state)
+    $ mv menu.txt menu.md
+    $ git status (shows menu.txt as deleted and menu.md as untracked)
+    $ git add menu.md
+    $ git status (shows the staged menu.md as new file)
+    $ git add menu.txt
+    $ git status (Surprise - this shows that menu.txt has been renamed to menu.md. Git attempted to compare approximately the contents of the staged file with the contents of the file in Repo and figured out this is the same file)
+    $ git commit -m "Use Markdown for the menu"
+    $ git status (we're in clean state again)
+  - Explicit way (used rarely - moves the files in a Working Area and updates the Index in a single shot):
+    $ git mv menu.md menu.txt (tell git explicitly, that we are renaming/moving a file)
+    $ git commit -m "Well, I changed my mind about that renaming"
+    $ git status (we're in clean state again)
+
+
+The Four Areas: git reset
+======================
+* Why is 'reset' command confusing:
+  - To understand 'reset', you need to understand the three main Areas and Git's branches.
+  - 'reset' does different things in different contexts.
+
+* What are the commands that move branches:
+  - commit - when new commit is created, the branch moves to point at it
+  - merge - same as above, since the merge ends up in creating new commits
+  - rebase - same as above, since rebase ends up in creating new copies of commits
+  - pull - same as merge, but with the commits that are pulled from the remote branch
+  - ...
+  All of the above move branches implicitly as a side effect.
+
+* To explicitly move a branch use 'reset'.
+  - 'reset' does 2 things:
+    o moves the branch (usually current) to point to a specific commit, that now becomes the current commit
+    o copies data from the current commit over to Working Area and Index, depending on the options supplied
+  - Available options:
+    o --hard instructs git to copy the data from the current commit to both Working Area and Index
+    o --mixed (default option) instructs git to the data from the current commit only to Index and leave the Working Area alone
+    o --soft instructs git to not touch any of the areas, i.e. just move the branch and that's it.
+
+* Reset example 1: Completely reverting the whole project to the previous commit 
+  - Prepare repo:
+    $ git checkout master
+    $ git log -1
+    commit 6399e90a1cebc4ed09ba6c03a14345aa885895fa (HEAD -> master)
+    Author: Aleksandr Fokin <aleksandr.fokin@gmail.com>
+    Date:   Sun Aug 5 19:16:55 2018 +0300
+    Well, I changed my mind about that renaming
+  - The testcase
+    <Add Strawberry Squids to the menu.txt>
+    $ vim menu.txt
+    $ git add menu.txt
+    $ git status
+    $ git commit -m "Add Strawberry Squids to menu"
+    <Create new file recipes/strawberry_squids.txt>
+    $ vim recipes/strawberry_squids.txt
+    $ git add recipes
+    $ git status
+    $ git commit -m "Add placeholder recipe for squids"
+  - Now we want to revert the master branch to point to a commit before any squid thing took place and we also want to replace the contents of Working Area and Index with the data from this commit:
+    $ cat .git/refs/heads/master
+    7db5565e1cefafb46e5f38ec79606be788e16db5
+    $ git reset --hard 6399e90a1cebc4ed09ba6c03a14345aa885895fa
+    $ cat .git/refs/heads/master
+    6399e90a1cebc4ed09ba6c03a14345aa885895fa
+    The 2 commits we've done after this one will be garbage collected.
+
+* Reset example 2: Unstaging all the changes, but preserving them in the Working Area
+  - The testcase:
+    <Add BBQ to the menu.txt>
+    $ vim menu.txt
+    $ git diff
+    $ git add menu.txt
+    $ git status (the menu.txt is staged)
+  - Now we change our minds and want to clean the staged file. For example, maybe to commit something else first and get back to these changes later, i.e. we want to keep changes in the working area, but remove them from Index. In the Index we want the same version of the files as in Repo. One way of doing this is `git rm --cached` and the alternative is to use 'reset':
+    $ git reset HEAD (if the file path is added as a param after HEAD - only this specific file gets reset, but this doesn't work with --hard option)
+    This means that we're moving the current branch to the commit pointed at by HEAD, but the current branch is already pointing at that commit by definition, so in this case, the 'reset' moves the branch to the same place where it already is. The default implicit option is --mixed, which means, that the files in Index are replaced with the files from the Repo, but Working Area is left untouched (the local changes are still there).
+    $ git status (the menu.txt is unstaged)
+  - Now we want to get rid of this change in Working Area as well:
+    $ git reset HEAD --hard (this is one of most popular git commands, but it is also destructive)
+
+
+The Four Areas: More Tools
+======================
+* The Stash - like a multiple clipboard for the project
+  - The testcase:
+    <Create guacamole recipy>
+    $ touch recipes/guacamole.txt
+    $ ls recipes
+    $ git add recipes/guacamole.txt
+    $ git status
+    <Add guacamole to the menu.txt>
+    vim menu.txt
+  - Now we quickly need to switch to something else, but don't want to lose any changes in the Working Area or Index:
+    $ git stash --include-untracked
+    What happens here is that:
+    o git takes all the data from the Working Area and Index that is not in the current commit in the repository and copies all that to Stash
+    o git checks out the current commit, which resets both Working Area and Index files
+    $ git status (we're in the clean state again)
+  - Check what Stash currently contains:
+    $ git stash list (can be multiple content packages stored)
+  - Revert the information from Stash over to Working Area and Index:
+    $ git stash apply 0 (where 0 is the index of stash package. The latest stash content package is picked by default if the last param ommitted.)
+  - Completing the work on the previously stashed change:
+    $ git add menu.txt
+    $ vim recipes/guacamole.txt
+    $ git add recipes/guacamole.txt
+    $ git status
+    $ git commit -m "Add guacamole"
+    $ git stash list
+    $ git stash clear (clears the entire stash)
+    $ git stash list
+
+* Solving Conflicts
+  - Create branch for adding tomato to guacamole:
+    $ git branch tomato
+    $ git checkout tomato
+    <Add tomato to recipes/guacamole.txt>
+    $ vim recipes/guacamole.txt
+    $ git add recipes/guacamole.txt
+    $ git commit -m "Add tomato to guacamole"
+    $ git log -1
+    commit e95160feaa6efb52b95324e13d44e1b404b01a65 (HEAD -> tomato)
+    Author: Aleksandr Fokin <aleksandr.fokin@gmail.com>
+    Date:   Sun Aug 5 22:35:18 2018 +0300
+    Add tomato to guacamole
+  - Switching to master and creating a conflict:
+    $ git checkout master
+    <Add onion to recipes/guacamole.txt>
+    $ vim recipes/guacamole.txt
+    $ git add recipes/guacamole.txt
+    $ git commit -m "Add onion to guacamole"
+    $ git log -1
+    commit fe3fdb860571aac1459c1f6de3833a5696d06f0c (HEAD -> master)
+    Author: Aleksandr Fokin <aleksandr.fokin@gmail.com>
+    Date:   Sun Aug 5 22:36:42 2018 +0300
+    Add onion to guacamole
+  - Let's merge 'tomato' branch to 'master' (current branch)
+    $ git merge tomato
+    $ git status (shows that there is a conflict to be resolved)
+    $ vim recipes/guacamole.txt (we have been provided all info there in this file to solve the conflict manually)
+    <Keeping both tomato and onion>
+  - How does `git status` know we are in the middle of the merge and there is a conflict in this file?
+    $ ls .git
+    ... MERGE_HEAD, MERGE_MSG, MERGE_MODE ...
+    $ cat .git/MERGE_HEAD (is a temporary reference that points to the tip of the branch that we're merging, i.e. 'tomato')
+    e95160feaa6efb52b95324e13d44e1b404b01a65
+    $ git show e95160feaa6efb52b95324e13d44e1b404b01a65
+  - Telling git that the conflict is resolved:
+    $ git status (still shows the conflict)
+    $ git add recipes/guacamole.txt
+    $ git status
+    $ git commit
+    <Leave the default message, :wq>
+  - Checking merge outcome:
+    $ git log -1
+    commit d37ccbb7bd4023758888169c426d219f35a8a1fc (HEAD -> master)
+    Merge: fe3fdb8 e95160f
+    Author: Aleksandr Fokin <aleksandr.fokin@gmail.com>
+    Date:   Sun Aug 5 22:40:43 2018 +0300
+    Merge branch 'tomato'
+    $ git cat-file -p d37ccbb7bd4023758888169c426d219f35a8a1fc
+    tree 9f0ce8beb23e522bcf1778f688d4d6e26bc55aad
+    parent fe3fdb860571aac1459c1f6de3833a5696d06f0c
+    parent e95160feaa6efb52b95324e13d44e1b404b01a65
+    author Aleksandr Fokin <aleksandr.fokin@gmail.com> 1533498043 +0300
+    committer Aleksandr Fokin <aleksandr.fokin@gmail.com> 1533498043 +0300
+    Merge branch 'tomato'
+
+* Working with Paths
+  - We spent a lot of time working with commits, and indeed:
+    o when we reset - we reset to a commit
+    o when we checkout - we checkout a commit
+    A commit is like a snapshot of the entire project directory at some point in time.
+  - Example: When we don't need to work with the entire project, but just some file instead
+    <Make all text in menu.txt and recipes/README.txt uppercase>
+    $ vim menu.txt (press v for visual select, Shift + U, Esc, :wq)
+    $ vim recipes/README.txt
+    $ git add .
+    $ git status (both files staged)
+  - We want to leave the change in the recipes/README.txt, but revert the menu.txt:
+    $ git reset HEAD menu.txt (--mixed is used by default, but we want the file in Working Area to revert as well)
+    $ git status
+    $ git reset HEAD menu.txt --hard (apparently, doesn't work!)
+    $ git checkout HEAD menu.txt (works, but it is destructive command, so be careful)
+    This is the most common way to reset a single file or directory. In this case 'checkout' will not move the HEAD to point to a new branch, but will copy the contents of a single file over to Index and Working Area. Be careful, since there is no warning shown when the Working Area data gets overridden.
+  - Commit the leftover changes:
+    $ git status
+    $ git commit -m "Make README all uppercase"
+
+* Git is a Toolbox
+  Within a Toolbox, for example, a hammer can be used to plant a nail, remove a nail or to straighten a bent piece of metal. In other words - the hammer may have multiple uses. Git is also a Toolbox - it has a bunch of tools and a lot of flexibility in how to use them. For example, git 'reset' can be used to unstage a file, clean-up working directory, remove the top commits from the history, etc.
+
+
+History: Exploring the Past
+======================
+* A Commit by any other Name
+  - When talking about project history, we are mostly talking about commits. There are many ways to refer to a commit.
+  - Referring commits:
+    $ git branch
+    $ git checkout nogood
+    $ git log (not very useful when trying to make sense of a complex history - everything squashed in a single list)
+    $ git log --graph --decorate --oneline (graph-like structure + positional references + 1 line/1 commit)
+    $ git show <commit hash | branch pointing to a commit | HEAD pointing to a branch> (shows commit info, diff)
+    $ git show HEAD     (asking for a commit that HEAD is pointing to)
+    $ git show HEAD^    (asking for a parent commit of HEAD)
+    $ git show HEAD^^   (asking for a parent of a parent of HEAD)
+    $ git show HEAD~2   (equivalent of the above, means: go to HEAD and then go back 2 commits)
+    $ git show HEAD~1^2 (start from the HEAD, then go back 1 commit, then pick the 2nd parent, if it was a merge commit)
+    $ git show HEAD@{"1 month ago"} (shows where HEAD was 1 month ago)
+  - Show where the lines in the file are coming from, i.e. which commits have added or changed them:
+    $ git blame recipes/apple_pie.txt
+  - Compare 2 commits:
+    $ git diff HEAD HEAD~2 (comparing current commit with 2 commits ago)
+    $ git diff nogood master (comparing nogood branch commit with master branch commit, useful before merging)
+
+* Git log: The most useful command to explore the project's history.
+  - Show high level history graph:
+    $ git log --graph --decorate --oneline
+  - Git log has a huge amount of options and is very powerful:
+    $ git help log
+  - Get detailed diff for each commit in the log:
+    $ git log --patch (adds details of the actual changes to the commit output)
+  - Filtering:
+    o Only show those containing string "apples" in their message:
+      $ git log --grep apples --oneline
+    o Only show those that have added or removed the word "apples" in any file:
+      $ git log -Gapples --patch (the --patch option shows the exact lines impacted)
+    o Visualize the specific range of commits:
+      $ git log -3 --oneline
+    o Show the range of commits from 5 commits before HEAD to the parent of a HEAD:
+      $ git log HEAD~4..HEAD^ --oneline
+    o If current branch is 'nogood' and we want to list the commits that are in the 'master' branch, but not in the 'nogood' branch:
+      $ git log nogood..master --oneline
+      This is different from diff - a diff compares contents (details) and here we are comparing history (commits). Beneficial doing this before the merge.
+
+
+History: Fixing Mistakes
+======================
+* The Golden Rule: Never change shared history.
+  !! Never rebase shared commits !! This causes issues for others using same origin when copies of commit are made. None of the techniques below should be used on the history that has been pushed to origin.
+
+* Fixing the latest commit:
+  - Add new recipe to menu.txt:
+    $ git checkout master
+    $ vim menu.txt
+    <Add Caesar Salad>
+    $ git add menu.txt
+    $ git commit -m "Add Caesar Salad to menu" (!! The recommended style for Git messages are present tense Added -> Add)
+    $ git log -1
+  - Now we realized, that a new recipe has to exist for each menu option:
+    $ cat recipes/README.txt
+  - Add new recipe file:
+    $ vim recipes/ceasar_salad.txt
+    <Add ingredients>
+    $ git add recipes/ceasar_salad.txt
+  - We don't want to create another commit for this fix, but want to use the previous one instead:
+    $ git commit --amend
+    <change the commit message if desired, :wq>
+  - Git cannot change the commit objects, since these are immutable. Instead Git creates another commit that contains both changes now and edited comment message. As usual when creating new commits - branch moves as well. The previous commit will be garbage collected.
+    $ git show HEAD
+    
+* Fixing a commit a few commits ago:
+  - Apparently, menu.txt contains Cheesecake and Chiken Tikka Masala, which are missing files under recipes/*:
+    $ ls recipes
+  - Let's check when these recipes were added to the menu.txt:
+    $ git blame menu.txt
+    8634eca3 (Aleksandr Fokin 2018-07-29 16:16:32 +0300 1) Spaghetti alla Carbonara
+    40bdad10 (Aleksandr Fokin 2018-07-28 23:23:31 +0300 2) Apple Pie
+    f06f03df (Aleksandr Fokin 2018-08-05 17:07:37 +0300 3) Cheesecake
+    338b29f7 (Aleksandr Fokin 2018-08-05 22:12:22 +0300 4) Chicken Tikka Masala
+    338b29f7 (Aleksandr Fokin 2018-08-05 22:12:22 +0300 5) Guacamole
+    5efc1057 (Aleksandr Fokin 2018-08-10 23:41:58 +0300 6) Ceasar Salad
+  - Now let's look at the log and see where f06f03d and 338b29f commits are:
+    $ git log --graph --decorate --oneline
+    * 5efc105 (HEAD -> master) Add Caesar Salad to menu
+    * cae0a3a Make README all uppercase
+    *   d37ccbb Merge branch 'tomato'
+    |\
+    | * e95160f (tomato) Add tomato to guacamole
+    * | fe3fdb8 Add onion to guacamole
+    |/
+    * 338b29f Add guacamole
+    * 6399e90 Well, I changed my mind about that renaming
+    * fb68cd0 Use Markdown for the menu
+    * f06f03d Add Tikka Masala to menu
+    * 0e313b0 (origin/master, origin/HEAD) Init repo for Mastering Git course
+    * f4a8665 Updated notes.txt with Appendix info
+    ...
+  - Now we have to be careful. Look at the position of the remote branches in the log, in particular - 'master' branch on origin (0e313b0). This is where the 'master' branch on GitHub currently is, i.e. where it was the last time we've synchronized with GitHub. Both f06f03d and 338b29f don't violate the Golden Rule (they are not pushed to origin/master on GitHub yet), so we can change them.
+  - We'll be fixing Chicken Tikka Masala (338b29f) commit in 2 stages:
+    o Create the recipe file and create a brand new commit
+      $ vim recipes/chicken_tikka_masala.txt
+      <Add ingredients>
+      $ git add recipes/chicken_tikka_masala.txt
+      $ git commit -m "Add missing chicken tikka masala placeholder"
+      $ git log -1 --oneline
+      0c656ee (HEAD -> master) Add missing chicken tikka masala placeholder
+    o Change project history so that this new commit and original Tikka Masala commit get squashed together in one single commit.
+      $ git log --graph --decorate --oneline
+      $ git rebase --interactive origin/master
+      Here rebase seizes to be a normal rebase and becomes super powerful history editing Swiss knife on steroids. As a last argument it needs a reference to a commit - this is to instruct git we'll be changing history from this commit (0e313b0) excluded onwards, i.e. from f06f03d commit till 0c656ee.
+
+  - Initial state of interactive rebase - the order is from least recent to most recent:
+
+    pick f06f03d Add Tikka Masala to menu
+    pick fb68cd0 Use Markdown for the menu
+    pick 6399e90 Well, I changed my mind about that renaming
+    pick 338b29f Add guacamole
+    pick fe3fdb8 Add onion to guacamole
+    pick e95160f Add tomato to guacamole
+    pick cae0a3a Make README all uppercase
+    pick 5efc105 Add Caesar Salad to menu
+    pick 0c656ee Add missing chicken tikka masala placeholder
+
+    # Rebase 0e313b0..0c656ee onto 0e313b0 (9 commands)
+    #
+    # Commands:
+    # p, pick = use commit
+    # r, reword = use commit, but edit the commit message
+    # e, edit = use commit, but stop for amending
+    # s, squash = use commit, but meld into previous commit
+    # f, fixup = like "squash", but discard this commit's log message
+    # x, exec = run command (the rest of the line) using shell
+    # d, drop = remove commit
+    #
+    # These lines can be re-ordered; they are executed from top to bottom.
+    #
+    # If you remove a line here THAT COMMIT WILL BE LOST.
+    #
+    # However, if you remove everything, the rebase will be aborted.
+    #
+    # Note that empty commits are commented out
+  
+  - Now we are to re-create history (create a copy of new amended history) by specifying the instructions and submitting them for processing:
+    o Reword the 6399e90 commit.
+    o Cut 0c656ee commit, paste it right below f06f03d and use 'squash' instruction.
+    o Squash together 338b29f, fe3fdb8 and e95160f.
+    
+    pick f06f03d Add Tikka Masala to menu
+    squash 0c656ee Add missing chicken tikka masala placeholder
+    pick fb68cd0 Use Markdown for the menu
+    reword 6399e90 Well, I changed my mind about that renaming
+    pick 338b29f Add guacamole
+    squash fe3fdb8 Add onion to guacamole
+    squash e95160f Add tomato to guacamole
+    pick cae0a3a Make README all uppercase
+    pick 5efc105 Add Caesar Salad to menu
+    
+    <:wq>
+    
+  - Executing interactive rebase:
+    o The f06f03d commit is picked and git looks at the next instruction.
+    o The terminal stops at 0c656ee commit and asks for the message to be used when squashing this commit with f06f03d. Type :wq after editing the message. The new commit is created containing both changes.
+    o The fb68cd0 commit is picked and a copy of it is re-written to a new history.
+    o The terminal stops at 6399e90 commit and suggests to edit its message. On :wq a new commit is created and gets re-written to a new history.
+    o The 338b29f commit is picked and git looks at the next instructions, which are 2 squashes: fe3fdb8 and e95160f.
+    o Git stops and complains about a conflict:
+      $ git status (note the files with the conflicts to resolve manually)
+      $ vim recipes/guacamole.txt
+      <Solve the conflict: Tomato, then Onion, :wq>
+      $ git add recipes/guacamole.txt
+      $ git rebase --continue
+      <Edit the final message, :wq>
+    o The cae0a3a commit is picked and a copy of it is re-written to a new history.
+    o The 5efc105 commit is picked and a copy of it is re-written to a new history.
+
+  - When everything is done - git moves the current branch to the new history and the old one will be garbage collected:
+    $ git log --graph --decorate --oneline
+    * 44ee7be (HEAD -> master) Add Caesar Salad to menu
+    * d083d38 Make README all uppercase
+    * 9303b21 Add guacamole
+    * 1dd7ef1 Fix bad renaming
+    * a25b6d8 Use Markdown for the menu
+    * 8048efe Add Tikka Masala to menu
+    * 0e313b0 (origin/master, origin/HEAD) Init repo for Mastering Git course
+    * f4a8665 Updated notes.txt with Appendix info
+    ...
+  - The other things that could be done by interactive rebasing - remove commits and splitting them into multiple smaller commits.
+
+* Standard workflow:
+  - When working on a project - commit early and often, even if they are half broken with bad messages.
+  - Before pushing to origin - make an interactive rebase tidying up the local commit history.
+
+* The Reflog:
+  - Every time reference moves in the repository, Git logs that move. Recovering hashes of abandoned objects, i.e. reaching the original commits the copies were made from and other things:
+    $ git checkout spaghetti
+    $ git checkout master
+    $ git reflog HEAD (check the reference movement log HEAD was pointing at)
+    $ git show HEAD@{15} (can check by hash or by reference)
+  - The reflog belongs to this repository and this repository alone, i.e. it is purely local. The logging exists since the repository was cloned from GitHub and all logs prior to that are not local:
+    $ git reflog refs/heads/master (the very first entry at the bottom is from clone)
+
+* Reverting commits (original commits left untouched):
+  - Reverts create new commits with new data that is the opposite of the existing data.
+  - In 'lisa' branch, notice, that commit that has added Cheesecake has already been pushed:
+    $ git checkout lisa
+    $ git log --graph --decorate --oneline
+    <Previously, we've added Cheesecake to the menu.txt, but no recipe in recipes folder>
+    $ git show 40bdad1
+  - Now we've decided to remove the Cheesecake commit alltogether. We could do an interactive rebase here, but it would almost entirely recreate history, so we will revert it:
+    $ git revert 40bdad1
+    Here git automatically creates a new commit that contains changes that are exactly the opposite pf the changes in this original commit.
+    $ git log --graph --decorate --oneline
+    $ git show HEAD
+  - !! Be careful when reverting merge commits !!    
+
+
+Finding Your Workflow
+======================
+* Workflows and Pain - What should our distributed workflow be?
+  - Agree on the Distribution Model to adopt:
+    o How many repositories?
+    o How do they interact?
+  - Agree on Branching Model:
+    o Which branches to we have?
+    o How do we use them?
+  - Constraints
+    o Do we merge or rebase?
+    o Can we push unstable code?
+
+* Distribution Models (most important, influences all other decisions down the line)
+  - Peer to Peer model: Simplest
+    o Each developer can see each other developer's repos as remotes.
+    o No repo is primary, which one to release from?
+    o Audience: this would work great for literally 2 people in a room, but not more.
+  - Centralized model: Blessed repo, Origin
+    o Everyone clones the repo from here and synchronizes with it.
+    o This is bare repository, i.e. it has no working area or index.
+    o It may also host the build routines to run unit tests, packages, releases, etc.
+  - Pull Request model: Most popular
+    o Has got bits of both Peer to Peer and Centralized model
+    o Everyone (contributors) can pull from it, but only limited amount of developers (maintainers) can push to it.
+    o The contributors engage maintainers by sending Pull Requests to them, which they review and push to centralized repo.
+  - Pull Request model: GitHub variation
+    o Same as Pull Request model, but all the contributors repos are actually in the Cloud as well as the Centralized repo. Contributors are not working directly on these repos, but have the clones on their local machines.
+  - Dictator and Leutenants model: For big complex projects, like Linux kernel
+    o Similar to Pull Request model, but there are 3 levels:
+        I. Dictator - receive Pull Requests from Leutenants and push changes to the main project.
+       II. Leutenants - receive the Pull Requests from Contributors, push them to the sub-projects and send pull requests to Dictator.
+      III. Contributors - send Pull Requests over to Leutenants.
+
+* Branching Models
+  - Stable branch - when the tip of it always contains a working version of the project, i.e. all tests green, no showstopper bugs.
+  - Unstable branch - there is no guarantee that the tip of the branch always contains a working version of the project.
+  - There is usually one main branch, form which the other branches are forked and then merged back to. The name of this branch is usually 'master', but it can be whatever: 'main', 'development', 'central', 'integration', etc. This is the branch where things come together and where we solve conflicts - handle the integration.
+  - In practice, integration branches are mostly stable, but not always. It is difficult to keep it stable with all constant forking and merging.
+  - Releasing and release branches:
+    o Some projects use integration branch and specific tagged commits that are used for releasing.
+    o Other projects prefer having separate branch for releases, a 'release' branch. The main advantage - the code in this branch can be kept more stable than in the integration branch, i.e. merging the integration branch into the release branch only after checking if it is stable. There can also be multiple release branches.
+  - Feature branches: when working on separate features of the same project, it usually makes sense to develop them in 2 separate branches in parallel and then converge back to integration branch only when they are done. This way the history is much cleaner. The feature branches are sometimes deleted afterwards.
+  - Hotfix branches: Let's say we have any 2 branches diverged - branch1 and branch2. Now branch1 have introduced the commit that branch2 needs to have, but we don't want to merge them yet. There are 2 options: 
+    o If we've agreed to use rebases, we can copy one specific commit from one branch to another, leaving the rest of the history untouched:
+    $ git cherry-pick <commit> (cherry-pick is a tiny rebase, i.e. it copies the commit)
+    o If we've agreed to use merges: we can introduce branch3 and place this commit there. Then we can merge branch3 into both branch1 and branch2. In the real life situations, branch1 and branch2 are the integration and release branches, where branch3 is the hotfix branch.
+
+* Constraints
+  - Rebase, don't merge / Merge, don't rebase.
+  - Who can do what on which branches? Do we use tags on integration branch or release branch for releasing?
+  - Don't push to a red build, so that the one caused red build have it easier to fix.
+  - Squash a feature to a single commit before mergeing to master or keep it granular.
+  - etc.
+
+* The most popular example - GitFlow: https://nvie.com/posts/a-successful-git-branching-model/
+  - Based on Centralized model, but also encourages Peer to Peer when appropriate.
+  - The core of Gitflow is its Branching Model:
+    o Unstable branches (for development work): 'develop' branch and 'feature' branches, 1 per feature.
+    o Stable branches (for releases): 'release' (1 per releaes), 'hotfixes, 'master' 
+      'Master' is also an integration branch, but different from 'develop', since it is stable. Here we only merge 'develop' into 'master' when we know we have a working system.
+  - There are also Constraints defined:
+    o Always merge, never rebase.
+    o Morals about what to tag and when.
+    o Naming conventions for branches.
+  - Gitflow even has its own extensions developed and shared via GitHub: https://github.com/nvie/gitflow
+  - The Gitflow has been adopted as is by many companies, but there are many projects for which Gitflow is not the optimal solution:
+    o If you're developing a web app rather than a packaged application, so we need to maintain only one production release at a time, i.e. there is no need for all those complex branching rules.
+    o Maybe we don't need multiple release branches and need only one.
+    o Maybe there are some other rules of the Gitflow that are counter-productive for the project.
+    o Maybe we're on a cutting edge project that does a continuous deployment, where the deployment to production happens each time someone integrates a stable feature.
+    o If there are some legacy projects with dozen of features developed in parallel and each feature can take months to be implemented and they tend to contain a lot of code. This may cause huge merge conflicts for other people in a team. Maybe in this case more frequent integration/merging makes more sense.
+
+* Growing a workflow
+  - Avoid the temptation to just sit down and design your workflow. This tends to generate an overdesigned, over-complicated workflow that still doesn't address the specific problems of the project.
+  - Start small, e.g.:
+    Distribution Model
+    o Centralized
+    Branching Model
+    o One Integration Branch (master)
+    o One Feature Branch per Feature
+    Constraints
+    o Keep master stable, fix it ASAP if it breaks
+    o Integrate Feature Branches every few days
+    o Use merge over rebase by default
+  - You might find that your very simple workflow is almost all you need actually. If it proves insufficient - just add the complexity as you go. Always feel free to remove rules, if they have no positive impact on the project.
+  - "Simple, clear purpose and principles give rise to complex and intelligent behavior. Complex rules and regulations give rise to simple and stupid behavior." (c) Dee Hock, CEO of Visa Credit
+
+* Recap, thinking in Git:
+  - The Four Areas: Stash, Working Area, Index/Staging Area, Repository
+  - Most git commands can be understood in 2 elements: how they move data across areas and what they do to repo.
+  - Master git user interacts with history a lot:
+    o Browsing: log, diff, blame.
+    o Refactoring: interactive rebases, amending commits, revert, reflog.
+  - Git Workflows: Distribution Model, Branching Model, Constraints.
+    Don't design a workflow upfront. Instead - start small and grow it.
+    
+
+Appendix A: Commands summary
+===========================
+* Local init, State:
+  - Create git repository in the current folder:
+    $ git init
+  - Create SHA1 of the content and write to the repository:
+    $ echo "Apple Pie" | git hash-object --stdin -w
+    23991897e13e47ed0adb91a0082c31c82fe0cbe5
+  - Get file contents (as-is, compressed):
+    $ cat .git/objects/23/991897e13e47ed0adb91a0082c31c82fe0cbe5
+  - Get contents of any git object by hash or name (branch, tag):
+    $ git cat-file -p 23991897e13e47ed0adb91a0082c31c82fe0cbe5
+  - Count repository database objects:
+    $ git count-objects
+  - Tell git explicitly, that we are renaming/moving a file (otherwise git guesses):
+    $ git mv menu.md menu.txt
+  - Show working area files status:
+    $ git status
+
+* Staging area/Index:
+  - Add all local changes and untracked files to Staging Area:
+    $ git add .
+  - Remove the file from Staging Area, but keep it in Working Area:
+    $ git rm pathtofile --cached
+  - Remove the file from both Staging Area and Working Area (if it is staged?):
+    $ git rm pathtofile -f
+  - Remove all files from Staging Area, but leave the changes in Working Area (--mixed used by default):
+    $ git reset HEAD
+  - Revert all changes in Staging Area and Working Area to the current commit (destructive):
+    $ git reset HEAD --hard
+  - Revert a single file changes in Staging Area and Working Area to the current commit (destructive):
+    $ git checkout HEAD pathtofile
+
+* Branches:
+  - Show both local and remote branches:
+    $ git branch --all
+  - Create new branch from the last commit that current branch points at:
+    $ git branch mybranch
+  - Checkout a different branch (or commit):
+    $ git checkout mybranch
+  - Create "feature2" branch, check it out and set it to track the "feature" branch on origin: 
+    $ git checkout -b feature2 origin/feature
+  - Reset the current branch to point to another commit:
+    o ... and copy the data from this commit to both Staging Area and Working Area (destructive):
+      $ git reset --hard 6399e90a1cebc4ed09ba6c03a14345aa885895fa
+    o ... and copy the data from this commit Staging Area and leave the Working Area unchanged (default behaviour):
+      $ git reset --mixed 6399e90a1cebc4ed09ba6c03a14345aa885895fa
+    o ... and leave both Staging Area and Working Area unchanged:
+      $ git reset --soft 6399e90a1cebc4ed09ba6c03a14345aa885895fa
+
+* Commits:
+  - Create commit:
+    $ git commit -m "This is a commit!"
+  - Amend last commit (another commit is created containing changes from both commits, avoid if pushed already):
+    $ git commit --amend
+  - Show where the lines in the file are coming from, i.e. which commits have added or changed them:
+    $ git blame recipes/apple_pie.txt
+  - Revert commit (create new commit with the exact opposite changes of a given commit):
+    $ git revert 40bdad1
+  - Show commit info and diff:
+    $ git show <commit hash | branch pointing to a commit | HEAD pointing to a branch>
+  - Show a commit that HEAD is pointing to:
+    $ git show HEAD
+  - Show a parent commit of HEAD:
+    $ git show HEAD^
+  - Show a parent of a parent of HEAD:
+    $ git show HEAD^^
+    or equivalently:
+    $ git show HEAD~2 (go to HEAD and then go back 2 commits)
+  - Start from the HEAD, then go back 1 commit, then pick the 2nd parent (if it was a merge commit):
+    git show HEAD~1^2
+  - Show where HEAD was 1 month ago:
+    $ git show HEAD@{"1 month ago"}
+
+* Differences:
+  - Compare the Working Area with Index (usually `git status` is used instead):
+    $ git diff
+  - Compare the Index with Repository (stuff I want to commit with stuff that is already committed):
+    $ git diff --cached
+  - Compare current commit with 2 commits ago:
+    $ git diff HEAD HEAD~2
+  - Compare the 2 commits/branches, useful before merging:
+    $ git diff lisa master
+
+* Merge:
+  - Merge changes from mybranch to the current branch:
+    $ git merge mybranch
+    <resolve any conflicts manually via text editor>
+    $ git add .
+    $ git commit
+    <Leave the default message, :wq>
+
+* Rebase:
+  - Rebase the current branch over the mybranch:
+    $ git rebase mybranch
+    <resolve any conflicts manually via text editor>
+    $ git add .
+    $ git commit
+    <Leave the default message, :wq>
+    
+- Interactive rebase (creates new history, never include pushed commits):
+    $ git blame menu.txt (check the commit we're after)
+    $ git log --graph --decorate --oneline (check if this commit is not yet pushed and commit we'll be creating a new history from)
+    <Make the required changes, stage them and create a new commit>
+    $ git rebase --interactive origin/master (where origin/master is the reference commit, which is to instruct git we'll be changing history from this commit excluded onwards)
+    <Following message on the screen create the instructions for amending history, which will be executed on :wq>
+    <In case rebase stops due to conflicts:>
+    $ git status (note the files with the conflicts to resolve manually)
+    <Solve the conflicts>
+    $ git add recipes/guacamole.txt
+    $ git rebase --continue
+    <Edit the final message, :wq>
+    
+* Browse History:
+  - Show all commits squashed in a single list:
+    $ git log
+  - Show high level history graph (graph-like structure + positional references + 1 line/1 commit):
+    $ git log --graph --decorate --oneline
+  - Show last commit of the current branch:
+    $ git log -1
+  - Git log has a huge amount of options and is very powerful:
+    $ git help log
+  - Get detailed diff for each commit in the log:
+    $ git log --patch (adds details of the actual changes to the commit output)
+  - Filtering:
+    o Only show those containing string "apples" in their message:
+      $ git log --grep apples --oneline
+    o Only show those that have added or removed the word "apples" in any file:
+      $ git log -Gapples --patch (the --patch option shows the exact lines impacted)
+    o Visualize the specific range of commits:
+      $ git log -3 --oneline
+    o Show the range of commits from 5 commits before HEAD to the parent of a HEAD:
+      $ git log HEAD~4..HEAD^ --oneline
+    o If current branch is 'nogood' and we want to list the commits that are in the 'master' branch, but not in the 'nogood' branch:
+      $ git log nogood..master --oneline
+      This is different from diff - a diff compares contents (details) and here we are comparing history (commits). Beneficial doing this before the merge.
+
+* The Reflog:
+  - Check the reference movement log HEAD was pointing at:
+    $ git reflog HEAD
+  - Check the reference movement log of the specific branch:
+    $ git reflog refs/heads/master (the very first entry at the bottom is from clone)
+      
+* Tags:
+  - Show tags:
+    $ git tag
+  - Create a tag for the last commit that current branch points at:
+    $ git tag mytag
+  - Create annotated tag for the last commit that current branch points at:
+    $ git tag -a myannotatedtag -m "Message for tag"
+
+* Remote Init:
+  - Link local repository with remote repository ("origin"):
+    $ git remote add origin https://github.com/aleksf0/how-git-works.git
+  - Set the "origin" remote branch as "upstream" and push all local .git/refs/heads, .git/refs/remotes, .git/refs/tags, etc. to it:
+    <create how-git-works repository on GitHub>
+    $ git push --set-upstream origin --mirror
+  - Clone remote git repository locally:
+    $ git clone https://github.com/aleksf0/how-git-works.git
+
+* Remote synchronisation:
+  - Show all refs (local/remote branches, tags) containing word 'master':
+    $ git show-ref master
+  - Fetch the git object database (including commits) from all origin branches (or only the ones existing in local repo?):
+    $ git fetch
+  - Merge the commits from the tracking/corresponding branch on origin to the current branch:
+    $ git merge
+  - Fetch the commits from "feature1" branch on the origin and merge them to the current branch:
+    $ git pull origin feature1
+  - Fetch the commits from the tracking/corresponding branch on origin and merge them to the current branch:
+    $ git pull
+  - Create an upstream branch "branch1" on the origin and push the commits to it from local branch "branch1" (which branch is checked-out currently has no difference):
+    $ git push --set-upstream origin branch1
+  - Push the commits from the local "branch1" branch over to the tracking/corresponding branch on origin (usually "origin/branch1", which branch is checked-out currently has no difference):
+    $ git push origin branch1
+  - Push the commits from the current branch over to the tracking/corresponding branch on origin (usually by the same name):
+    $ git push
+    
+* Stash:
+  - Move the local changes to the Working Area and Staging Area to Stash:
+    $ git stash --include-untracked
+  - Check the items Stash currently contains:
+    $ git stash list
+  - Revert the files from Stash over to Working Area and Staging Area:
+    $ git stash apply 0 (where 0 is the index of stash package)
+  - Clear the entire stash:
+    $ git stash clear
+
+
+Appendix B: Git repository file structure
+===========================
+.git/HEAD - a pointer to a branch or a commit
+.git/objects/* - git repository object database (blobs, trees, commits, annotated tags)
+.git/refs/heads/* - local branches (point to a commit, changed on a commit)
+.git/refs/remotes/*, /.git/packed-refs - remote branches (point to a commit, updated on push/pull)
+.git/refs/tags/* - tags (point to a commit, left unchanged on commit)
+.git/config - the configuraiton properties of the repository
+.git/index - staging area
