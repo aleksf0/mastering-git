@@ -675,18 +675,21 @@ Appendix A: Commands summary
     $ git commit
     <Leave the default message, :wq>
     
-- Interactive rebase (creates new history, never include pushed commits):
-    $ git blame menu.txt (check the commit we're after)
-    $ git log --graph --decorate --oneline (check the commit we'll be creating a new history from and make sure it is not yet pushed)
-    <Make the required changes, stage them and create a new commit>
+* Interactive rebase (creates new history, never include pushed commits):
+  - Check the code lines we're after:
+    $ git blame menu.txt
+  - Check the commit we'll be creating a new history from and make sure it is not yet pushed:
+    $ git log --graph --decorate --oneline
+  - Make the required changes, stage them, create a new commit and start the interactive rebase: 
     $ git rebase --interactive origin/master (where origin/master is the reference commit, which is to instruct git we'll be changing history from this commit excluded onwards)
-    <Following message on the screen create the instructions for amending history, which will be executed on :wq>
-    <In case rebase stops due to conflicts:>
+  - Follow the message on the screen to create the instructions for amending history, which will be executed on typing :wq
+  - In case rebase stops due to conflicts:
     $ git status (note the files with the conflicts to resolve manually)
-    <Solve the conflicts>
+  - Solve the conflicts:
     $ git add recipes/guacamole.txt
+  - Continue the rebase:
     $ git rebase --continue
-    <Edit the final message, :wq>
+  - Edit the final message, type :wq
     
 * Browse History:
   - Show all commits squashed in a single list:
