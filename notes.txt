@@ -518,8 +518,8 @@ Finding Your Workflow
   - Feature branches: when working on separate features of the same project, it usually makes sense to develop them in 2 separate branches in parallel and then converge back to integration branch only when they are done. This way the history is much cleaner. The feature branches are sometimes deleted afterwards.
   - Hotfix branches: Let's say we have any 2 branches diverged - branch1 and branch2. Now branch1 have introduced the commit that branch2 needs to have, but we don't want to merge them yet. There are 2 options: 
     o If we've agreed to use rebases, we can copy one specific commit from one branch to another, leaving the rest of the history untouched:
-    $ git cherry-pick <commit> (cherry-pick is a tiny rebase, i.e. it copies the commit)
-    o If we've agreed to use merges: we can introduce branch3 and place this commit there. Then we can merge branch3 into both branch1 and branch2. In the real life situations, branch1 and branch2 are the integration and release branches, where branch3 is the hotfix branch.
+      $ git cherry-pick <commit> (cherry-pick is a tiny rebase, i.e. it copies the commit)
+    o If we've agreed to use merges: we can introduce branch3 that diverges from the same commit branches branch1 and branch2 were diverging from and place the changes there. Then we can merge the newest commit from branch3 into both branch1 and branch2. In the real life situations, branch1 and branch2 are the integration and release branches, where branch3 is the hotfix branch.
 
 * Constraints
   - Rebase, don't merge / Merge, don't rebase.
@@ -609,6 +609,10 @@ Appendix A: Commands summary
     $ git branch --all
   - Create new branch from the last commit that current branch points at:
     $ git branch mybranch
+  - Delete a local branch:
+    $ git branch -d mybranch
+  - Delete a remote branch:
+    $ git push --delete origin mybranch (where 'origin' is a remote name)
   - Checkout a different branch (or commit):
     $ git checkout mybranch
   - Create "feature2" branch, check it out and set it to track the "feature" branch on origin: 
@@ -673,7 +677,7 @@ Appendix A: Commands summary
     
 - Interactive rebase (creates new history, never include pushed commits):
     $ git blame menu.txt (check the commit we're after)
-    $ git log --graph --decorate --oneline (check if this commit is not yet pushed and commit we'll be creating a new history from)
+    $ git log --graph --decorate --oneline (check the commit we'll be creating a new history from and make sure it is not yet pushed)
     <Make the required changes, stage them and create a new commit>
     $ git rebase --interactive origin/master (where origin/master is the reference commit, which is to instruct git we'll be changing history from this commit excluded onwards)
     <Following message on the screen create the instructions for amending history, which will be executed on :wq>
@@ -721,6 +725,10 @@ Appendix A: Commands summary
     $ git tag mytag
   - Create annotated tag for the last commit that current branch points at:
     $ git tag -a myannotatedtag -m "Message for tag"
+  - Delete a local tag:
+    $ git tag -d mytag
+  - Delete a remote tag:
+    $ git push --delete origin mytag (where 'origin' is a remote name)
 
 * Remote Init:
   - Link local repository with remote repository ("origin"):
@@ -759,6 +767,19 @@ Appendix A: Commands summary
   - Clear the entire stash:
     $ git stash clear
 
+* Hotfixes:
+  - Locate the commit to diverge the 'hotfix-xx' branch from. This is usually the commit where 'master' and 'release' branches have diverged for the current release:
+    $ git log --graph --oneline --decorate
+    $ git checkout <commit>
+    $ git branch hotfix-01
+  - Apply the fix and test locally. If test successful - merge the 'hotfix-xx' branch to both 'master' and 'release' branches:
+    $ git checkout release
+    $ git merge hotfix-01
+    $ git checkout master
+    $ git merge hotfix-01
+  - Test 'release' with hotfix applied and if successful - delete the 'hotfix-xx' branch:
+    $ git branch -d hotfix-01
+
 
 Appendix B: Git repository file structure
 ===========================
@@ -769,3 +790,29 @@ Appendix B: Git repository file structure
 .git/refs/tags/* - tags (point to a commit, left unchanged on commit)
 .git/config - the configuraiton properties of the repository
 .git/index - staging area
+
+
+Appendix C: Git flow for small cross-functional teams with quick releases
+===========================
+* Inspiration
+  "Simple, clear purpose and principles give rise to complex and intelligent behavior. Complex rules and regulations give rise to simple and stupid behavior." (c) Dee Hock, CEO of Visa Credit
+
+* Distribution Model
+  - Centralized
+
+* Branching Model
+  - Single Development/Integration branch called 'master'
+  - Single Release branch called 'release'
+  - Multiple Feature branches created on demand when it makes sense
+
+* Constraints
+  - Keep 'master' stable, fix it ASAP if it breaks
+  - Use merge over rebase by default
+  - Do an interactive rebase to tidy up and squash the related local commits before pushing
+  - Only integrate versioned/tagged commits from the 'master' branch to the 'release' branch
+  - Integrate changes from Feature branches to 'master' branch every few days
+  - No changes are applied to the 'release' branch directly
+  - In a need of a hotfix:
+    o The new branch called 'hotfix-xx' is created from the commit where 'master' and 'release' branches have diverged for the current release
+    o The hotfix is implemented in this branch and merged to both 'master' and 'release' branches
+    o If the hotfix test is successful - delete the 'hotfix-xx' branch
